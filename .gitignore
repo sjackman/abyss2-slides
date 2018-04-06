@@ -1,3 +1,4 @@
 reveal.js-*
 revealjs-*.tar.gz
 *.html
+!index.html
