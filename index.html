@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <meta name="author" content="Shaun D Jackman">
+  <meta name="dcterms.date" content="2018-04-19">
+  <title>ABySS 2.0: Resource-efficient assembly of large genomes using a Bloom filter</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href="reveal.js/css/reveal.css">
+  <style type="text/css">
+      code{white-space: pre-wrap;}
+      span.smallcaps{font-variant: small-caps;}
+      span.underline{text-decoration: underline;}
+      div.column{display: inline-block; vertical-align: top; width: 50%;}
+  </style>
+  <link rel="stylesheet" href="reveal.js/css/theme/sky.css" id="theme">
+  <!-- Printing and PDF exports -->
+  <script>
+    var link = document.createElement( 'link' );
+    link.rel = 'stylesheet';
+    link.type = 'text/css';
+    link.href = window.location.search.match( /print-pdf/gi ) ? 'reveal.js/css/print/pdf.css' : 'reveal.js/css/print/paper.css';
+    document.getElementsByTagName( 'head' )[0].appendChild( link );
+  </script>
+  <!--[if lt IE 9]>
+  <script src="reveal.js/lib/js/html5shiv.js"></script>
+  <![endif]-->
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+
+<section id="abyss-2.0" class="slide level2">
+<h2>ABySS 2.0</h2>
+<h3 id="resource-efficient-assembly-of-large-genomes-using-a-bloom-filter">Resource-efficient assembly of large genomes using a Bloom filter</h3>
+<p><strong>Shaun D Jackman</strong> <a href="http://twitter.com/sjackman">@sjackman</a></p>
+<p>Benjamin P Vandervalk, Hamid Mohamadi, Justin Chu, Sarah Yeo, S Austin Hammond, Golnaz Jahesh, Hamza Khan, Lauren Coombe, Rene L Warren, Inanc Birol</p>
+<div class="line-block">RECOMB-Seq 2018-04-19<br />
+<a href="https://sjackman.ca/abyss2-slides" class="uri">https://sjackman.ca/abyss2-slides</a><br />
+Funded by Genome Canada · Genome BC · NIH · NSERC<br />
+<a href="http://creativecommons.org/licenses/by/4.0/"><img data-src="images/cc-by.png" alt="Creative Commons Attribution License" /></a></div>
+</section>
+<section id="shaun-jackman" class="slide level2">
+<h2>Shaun Jackman</h2>
+<div class="line-block"><a href="http://www.birollab.ca">Birol Bioinformatics Technology Lab</a><br />
+<a href="http://bcgsc.ca">BC Cancer Genome Sciences Centre</a> · Vancouver, Canada<br />
+<a href="http://twitter.com/sjackman">@sjackman</a> · <a href="https://github.com/sjackman">github.com/sjackman</a> · <a href="http://sjackman.ca">sjackman.ca</a><br />
+<img data-src="images/sjackman.jpg" alt="Shaun’s head shot" /></div>
+</section>
+<section id="short-read-genome-assembly" class="slide level2">
+<h2>Short Read Genome Assembly</h2>
+<div class="line-block">ABySS 1.0 (2009) was the first to assemble<br />
+a human genome from short reads (42 bp!)</div>
+<p><a href="https://doi.org/10.1101/gr.089532.108"><img data-src="images/abyss-paper.png" alt="ABySS 1.0 paper" /></a></p>
+<p><a href="http://bit.ly/abyss1-paper" class="uri">http://bit.ly/abyss1-paper</a> · <a href="http://doi.org/btnjx2">doi:btnjx2</a></p>
+</section>
+<section id="abyss-1.0" class="slide level2">
+<h2>ABySS 1.0</h2>
+<ul>
+<li>de Bruijn graph assembler</li>
+<li>Stored <em>k</em>-mers in a hash table</li>
+<li>Distributed the hash table over many machines</li>
+<li>Used MPI to aggregate sufficient memory</li>
+<li>Assembles large genomes</li>
+</ul>
+</section>
+<section id="abyss-1.0-1" class="slide level2">
+<h2>ABySS 1.0</h2>
+<table>
+<thead>
+<tr class="header">
+<th></th>
+<th>Human</th>
+<th>Spruce</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Genome size</td>
+<td>3 Gbp</td>
+<td>20 Gbp</td>
+</tr>
+<tr class="even">
+<td>RAM</td>
+<td>418 GB</td>
+<td>4.3 TB</td>
+</tr>
+<tr class="odd">
+<td>CPU cores</td>
+<td>64</td>
+<td>1,380</td>
+</tr>
+<tr class="even">
+<td>Wall time</td>
+<td>14 hours</td>
+<td>12 days</td>
+</tr>
+<tr class="odd">
+<td>Year</td>
+<td>2017</td>
+<td>2013</td>
+</tr>
+<tr class="even">
+<td>Short DOI</td>
+<td><a href="https://doi.org/f9x8qp">doi:f9x8qp</a></td>
+<td><a href="https://doi.org/f4zzrr">doi:f4zzrr</a></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="challenges" class="slide level2">
+<h2>Challenges</h2>
+<ul>
+<li>High memory usage</li>
+<li>Interprocess communication is slow</li>
+<li>Intermachine communication is really slow</li>
+</ul>
+</section>
+<section id="solution" class="slide level2">
+<h2>Solution</h2>
+<ul>
+<li><div class="line-block">A memory-efficient data structure<br />
+reduces memory usage</div></li>
+<li><div class="line-block">Fitting entire graph in a single machine<br />
+eliminates intermachine communication</div></li>
+<li><div class="line-block">OpenMP rather than MPI<br />
+eliminates interprocess communication</div></li>
+</ul>
+</section>
+<section id="abyss-2.0-1" class="slide level2">
+<h2>ABySS 2.0</h2>
+<div class="line-block">ABySS 2.0 (2017) reduces the memory<br />
+usage of ABySS by ten fold.</div>
+<p><a href="https://doi.org/10.1101/gr.214346.116"><img data-src="images/abyss2-paper.png" alt="ABySS 2.0 paper" /></a></p>
+<p><a href="http://bit.ly/abyss2-paper" class="uri">http://bit.ly/abyss2-paper</a> · <a href="https://doi.org/f9x8qp">doi:f9x8qp</a></p>
+</section>
+<section class="slide level2">
+
+<figure>
+<img data-src="images/data-structures.png" alt="Memory efficient de Bruijn graph using a Bloom filter Memory usage is independent of k" height="550" /><figcaption>Memory efficient de Bruijn graph using a Bloom filter<br>Memory usage is independent of <em>k</em></figcaption>
+</figure>
+</section>
+<section class="slide level2">
+
+<figure>
+<img data-src="images/bloom-dbg-nav.png" alt="Navigating a Bloom filter de Bruijn graph Introduced by Minia (Chikhi et al. 2012)" /><figcaption>Navigating a Bloom filter de Bruijn graph<br>Introduced by Minia (Chikhi <em>et al.</em> 2012)</figcaption>
+</figure>
+</section>
+<section class="slide level2">
+
+<figure>
+<img data-src="images/error-correction.png" alt="Sequencing errors and Bloom filter false positives" /><figcaption>Sequencing errors and Bloom filter false positives</figcaption>
+</figure>
+</section>
+<section class="slide level2">
+
+<figure>
+<img data-src="images/abyss2-read-extension.png" alt="Solid reads are extended using the Bloom filter de Bruijn graph to assemble unitigs" class="plain" /><figcaption>Solid reads are extended using the Bloom filter de Bruijn graph to assemble unitigs</figcaption>
+</figure>
+</section>
+<section class="slide level2">
+
+<figure>
+<img data-src="images/abyss2.mem-vs-time.png" alt="ABySS 2.0 reduces memory usage by 10 fold vs ABySS 1.0 for human genome assembly (GIAB HG004 NA24143)" height="550" /><figcaption>ABySS 2.0 reduces memory usage by 10 fold vs ABySS 1.0 for human genome assembly (GIAB HG004 NA24143)</figcaption>
+</figure>
+</section>
+<section id="spruce-genome-assemblies" class="slide level2">
+<h2>Spruce genome assemblies</h2>
+<table>
+<thead>
+<tr class="header">
+<th>ABySS</th>
+<th>1.3.5</th>
+<th>2.0.0</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Spruce species</td>
+<td>Interior</td>
+<td>Sitka</td>
+</tr>
+<tr class="even">
+<td>Machines</td>
+<td>115</td>
+<td>1</td>
+</tr>
+<tr class="odd">
+<td>RAM (GB)</td>
+<td>4,300</td>
+<td>500</td>
+</tr>
+<tr class="even">
+<td>CPU cores</td>
+<td>1,380</td>
+<td>64</td>
+</tr>
+<tr class="odd">
+<td>CPU time* (years)</td>
+<td>6.0</td>
+<td>3.2</td>
+</tr>
+<tr class="even">
+<td>Wall time* (days)</td>
+<td>1.6</td>
+<td>18</td>
+</tr>
+<tr class="odd">
+<td>Year</td>
+<td>2013</td>
+<td>2017</td>
+</tr>
+<tr class="even">
+<td>Short DOI</td>
+<td><a href="https://doi.org/f4zzrr">doi:f4zzrr</a></td>
+<td>NA</td>
+</tr>
+</tbody>
+</table>
+<p><small>* Time of unitig assembly without scaffolding</small></p>
+</section>
+<section class="slide level2">
+
+<figure>
+<img data-src="images/scaffold-NGA50-to-NG50.png" alt="Contiguity and correctness are comparable" height="600" /><figcaption>Contiguity and correctness are comparable</figcaption>
+</figure>
+</section>
+<section class="slide level2">
+
+<figure>
+<img data-src="images/ideogram.png" alt="41.9 Mbp NG50 scaffolded with BioNano optical mapping" height="600" /><figcaption>41.9 Mbp NG50 scaffolded with BioNano optical mapping</figcaption>
+</figure>
+</section>
+<section id="conclusion" class="slide level2">
+<h2>Conclusion</h2>
+<ul>
+<li><div class="line-block">ABySS 2.0 reduces memory usage by 10 fold<br />
+from 418 GB for ABySS 1.0<br />
+to 34 GB for ABySS 2.0<br />
+for a human genome assembly</div></li>
+<li><div class="line-block">High-throughput short-read sequencing<br />
+combined with large molecule scaffolding<br />
+such as 10X Genomics, BioNano, Hi-C<br />
+permits cost effective assembly of large genomes</div></li>
+</ul>
+</section>
+<section><section id="fin" class="title-slide slide level1"><h1>fin</h1></section><section id="posters" class="slide level2">
+<h2>Posters</h2>
+<ul>
+<li>SEQ-7 <strong>Tigmint</strong>: Correcting Assembly Errors Using Linked Reads From Large Molecules</li>
+<li>SEQ-6 <strong>ARKS</strong>: chromosome-scale human genome scaffolding with linked read kmers</li>
+<li>SEQ-10 <strong>ONTig</strong>: Contiguating Genome Assembly using Oxford Nanopore Long Reads</li>
+<li>SEQ-8 <strong>Multi-Index Bloom Filters</strong>: A probabilistic data structure for sensitive multi-reference sequence classification with multiple spaced seeds</li>
+</ul>
+</section><section id="shaun-jackman-1" class="slide level2">
+<h2>Shaun Jackman</h2>
+<p><a href="http://twitter.com/sjackman">@sjackman</a> · <a href="https://github.com/sjackman">github.com/sjackman</a> · <a href="http://sjackman.ca">sjackman.ca</a></p>
+<p>Benjamin P Vandervalk, Hamid Mohamadi, Justin Chu, Sarah Yeo, S Austin Hammond, Golnaz Jahesh, Hamza Khan, Lauren Coombe, Rene L Warren, Inanc Birol</p>
+<div class="line-block"><strong>ABySS 2.0</strong><br />
+<a href="https://github.com/bcgsc/abyss" class="uri">https://github.com/bcgsc/abyss</a><br />
+<strong>ABySS 2.0 Paper</strong><br />
+<a href="http://bit.ly/abyss2-paper" class="uri">http://bit.ly/abyss2-paper</a> · <a href="https://doi.org/f9x8qp">doi:f9x8qp</a><br />
+<strong>Slides</strong><br />
+<a href="http://sjackman.ca/abyss2-slides" class="uri">http://sjackman.ca/abyss2-slides</a><br />
+<a href="https://github.com/sjackman/abyss2-slides" class="uri">https://github.com/sjackman/abyss2-slides</a><br />
+Funded by Genome Canada · Genome BC · NIH · NSERC</div>
+</section></section>
+<section><section id="supplemental-slides" class="title-slide slide level1"><h1>Supplemental Slides</h1></section><section class="slide level2">
+
+<figure>
+<img data-src="images/assembly-algorithm.png" alt="ABySS 2.0 assembly algorithm" class="plain" /><figcaption>ABySS 2.0 assembly algorithm</figcaption>
+</figure>
+</section><section class="slide level2">
+
+<figure>
+<img data-src="images/assembler-comparison.png" alt="Assembler comparison" height="600" /><figcaption>Assembler comparison</figcaption>
+</figure>
+</section><section class="slide level2">
+
+<figure>
+<img data-src="images/coverage-identity.png" alt="Genome coverage and identity" /><figcaption>Genome coverage and identity</figcaption>
+</figure>
+</section><section class="slide level2">
+
+<figure>
+<img data-src="images/abyss2_bionano_arcs.png" alt="Jupiter plot of scaffolds mapped to the reference genome" height="600" /><figcaption>Jupiter plot of scaffolds mapped to the reference genome</figcaption>
+</figure>
+</section></section>
+    </div>
+  </div>
+
+  <script src="reveal.js/lib/js/head.min.js"></script>
+  <script src="reveal.js/js/reveal.js"></script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        // Display the page number of the current slide
+        slideNumber: true,
+        // Push each slide change to the browser history
+        history: true,
+
+        // Optional reveal.js plugins
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true }
+        ]
+      });
+    </script>
+    </body>
+</html>
