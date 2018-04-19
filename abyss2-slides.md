@@ -138,6 +138,13 @@ Benjamin P Vandervalk, Hamid Mohamadi, Justin Chu, Sarah Yeo, S Austin Hammond, 
 fin
 ================================================================================
 
+## Posters
+
+- SEQ-7 **Tigmint**: Correcting Assembly Errors Using Linked Reads From Large Molecules
+- SEQ-6 **ARKS**: chromosome-scale human genome scaffolding with linked read kmers
+- SEQ-10 **ONTig**: Contiguating Genome Assembly using Oxford Nanopore Long Reads
+- SEQ-8 **Multi-Index Bloom Filters**: A probabilistic data structure for sensitive multi-reference sequence classification with multiple spaced seeds
+
 ## Shaun Jackman
 
 [\@sjackman][] &middot; [github.com/sjackman](https://github.com/sjackman) &middot; [sjackman.ca](http://sjackman.ca)
